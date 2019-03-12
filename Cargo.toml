@@ -1,0 +1,13 @@
+[package]
+name = "websocket_try"
+version = "0.1.0"
+authors = ["iyuroch <iyuroch@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+futures = "0.1.25"
+tokio = "0.1.16"
+websocket = "0.22.3"
+tokio-threadpool = "0.1.12"
+tungstenite = "0.6.1"
+tokio-tungstenite = "0.6.0"
