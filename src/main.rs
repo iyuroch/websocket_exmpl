@@ -26,6 +26,7 @@ extern crate tungstenite;
 use std::time::Duration;
 use std::env;
 use std::io::{Error, ErrorKind};
+use std::sync::{Arc, Mutex};
 
 use tokio_threadpool::blocking;
 use futures::stream::Stream;
@@ -68,7 +69,8 @@ fn main() {
 
             // Let's split the WebSocket stream, so we can work with the
             // reading and writing halves separately.
-            let (mut sink, stream) = ws_stream.split();
+            let (sink, stream) = ws_stream.split();
+            let sink_cell = Arc::new(Mutex::new(sink));
 
             // Whenever we receive a message from the client, we print it and
             // send to other clients, excluding the sender.
@@ -77,24 +79,38 @@ fn main() {
                 Ok(())
             });
 			
-			let mut counter = 0;
+			let counter = Arc::new(Mutex::new(0));
 
 			let ws_writer = Interval::new_interval(Duration::from_millis(3000))
-							.for_each(move |_instant| {
-								counter += 1;
-								println!("fire; instant={:?}", counter);
-								tokio::spawn(lazy(move || {
-										poll_fn(move || {
-											blocking(|| {
-												let msg = fibonacci(counter);
-												println!("fibonacci; msg={:?}", msg);
-												// sink.start_send(Message::from(msg.to_string())).unwrap();
-											}).map_err(|_| panic!("the threadpool shut down"))
-										})
+							.for_each(move |_| {
+								// counter += 1;
+                                let counter = counter.clone();
+                                // &counter.lock().unwrap() += 1;
+                                // counter.replace(inner_counter + 1);
+                                // inner_counter += 1;
+								// println!("fire; instant={:?}", counter);
+                                let sink_cell = sink_cell.clone();
+								let fut = lazy(move || {
+                                    let sink_cell = sink_cell.clone();
+                                    let counter = counter.clone();
+									poll_fn(move || {
+                                        let sink_cell = sink_cell.clone();
+                                        let counter = counter.clone();
+										blocking(move || {
+                                            let mut counter = counter.lock().unwrap();
+                                            *counter += 1;
+											let msg = fibonacci(*counter);
+                                            let mut sink = sink_cell.lock().unwrap();
+                                            sink.start_send(Message::from(msg.to_string())).unwrap();
+										}).map_err(|_| panic!("the threadpool shut down"))
 									})
-								);
-								Ok(())
-							})
+								});
+
+								tokio::spawn(
+                                    fut
+                                );
+                                Ok(())
+                            })
 							.map_err(|e| panic!("interval errored; err={:?}", e));
 
             let connection = ws_reader.map(|_| ()).map_err(|_| ())
