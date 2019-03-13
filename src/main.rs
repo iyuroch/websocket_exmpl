@@ -1,22 +1,3 @@
-//! A chat server that broadcasts a message to all connections.
-//!
-//! This is a simple line-based server which accepts WebSocket connections,
-//! reads lines from those connections, and broadcasts the lines to all other
-//! connected clients.
-//!
-//! You can test this out by running:
-//!
-//!     cargo run --example server 127.0.0.1:12345
-//!
-//! And then in another window run:
-//!
-//!     cargo run --example client ws://127.0.0.1:12345/
-//!
-//! You can run the second command in multiple windows and then chat between the
-//! two, seeing the messages from the other client as they're received. For all
-//! connected clients they'll all join the same room and see everyone else's
-//! messages.
-
 extern crate futures;
 extern crate tokio;
 extern crate tokio_threadpool;
@@ -35,7 +16,6 @@ use futures::future::{lazy, poll_fn};
 use futures::Sink;
 use tokio::timer::Interval;
 use tokio::net::TcpListener;
-// use tokio::
 use tungstenite::protocol::Message;
 
 use tokio_tungstenite::accept_async;
@@ -57,8 +37,6 @@ fn main() {
     let socket = TcpListener::bind(&addr).unwrap();
     println!("Listening on: {}", addr);
 
-	// let mut rt = tokio::runtime::Runtime::new().unwrap();
-
     let srv = socket.incoming().for_each(move |stream| {
 
         let addr = stream.peer_addr().expect("connected streams should have a peer address");
@@ -72,8 +50,6 @@ fn main() {
             let (sink, stream) = ws_stream.split();
             let sink_cell = Arc::new(Mutex::new(sink));
 
-            // Whenever we receive a message from the client, we print it and
-            // send to other clients, excluding the sender.
             let ws_reader = stream.for_each(move |message: Message| {
                 println!("Received a message from {}: {}", addr, message);
                 Ok(())
@@ -83,13 +59,10 @@ fn main() {
 
 			let ws_writer = Interval::new_interval(Duration::from_millis(3000))
 							.for_each(move |_| {
-								// counter += 1;
+
                                 let counter = counter.clone();
-                                // &counter.lock().unwrap() += 1;
-                                // counter.replace(inner_counter + 1);
-                                // inner_counter += 1;
-								// println!("fire; instant={:?}", counter);
                                 let sink_cell = sink_cell.clone();
+
 								let fut = lazy(move || {
                                     let sink_cell = sink_cell.clone();
                                     let counter = counter.clone();
@@ -128,6 +101,5 @@ fn main() {
         })
     });
 
-    // Execute server.
     tokio::run(srv.map_err(|_e| ()));
 }
